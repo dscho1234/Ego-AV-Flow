@@ -1,0 +1,23 @@
+defaults:
+  - common
+  - _self_
+
+cotracker_checkpoint: ${checkpoint_root}/cotracker3/scaled_online.pth
+sd_model_path: ${checkpoint_root}/stable-diffusion-2-1
+dift_ensemble_size: 8
+
+tracking_hw: [256, 256]  # resolution of the 2D tracking
+
+# Query points [start, end) belonging to each object, in the order of the object masks; only the
+# ranges of existing objects are used (with a single object, points 4 and 5 are not filtered).
+query_point_object_ranges: [[0, 4], [4, 6]]
+# A point is invisible when its depth differs from the mean depth of its object mask by more than this (m)
+mask_point_tracking_threshold: 0.1
+num_points_per_mask: 64  # points sampled per mask and frame to compute the mean depth
+
+# Also track points sampled on the object masks (mask_{pixel,point}_tracking_sequence)
+track_mask: true
+num_mask_tracking_points: 64
+
+save_video: true
+seed: 0  # per episode: seed + episode index

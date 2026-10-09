@@ -1,0 +1,11 @@
+# Machine-specific locations. Override with environment variables or on the command line,
+# e.g. `python train_active_vision.py paths.data_root=/path/to/data`.
+# These stay as interpolations in the saved run config, so a trained checkpoint resolves them
+# again on whichever machine it is evaluated.
+
+# Processed datasets: <data_root>/<dataset_name>{,_invisible,_validation}
+data_root: ${oc.env:EGOAVFLOW_DATA_ROOT,${egoavflow_root:}/data}
+# Training runs (checkpoints, stats, logs)
+output_root: ${oc.env:EGOAVFLOW_OUTPUT_ROOT,${egoavflow_root:}/outputs}
+# Pretrained third-party weights (scripts/download_checkpoints.sh)
+checkpoint_root: ${oc.env:EGOAVFLOW_CHECKPOINT_ROOT,${egoavflow_root:}/checkpoints}

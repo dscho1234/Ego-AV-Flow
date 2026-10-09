@@ -1,0 +1,2 @@
+# raw recording of the example episode (see README, "Example episode")
+example_data/raw/**/*.png filter=lfs diff=lfs merge=lfs -text

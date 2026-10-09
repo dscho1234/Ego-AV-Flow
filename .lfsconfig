@@ -1,0 +1,4 @@
+# The raw example recording is only downloaded on request:
+#   git lfs pull --include="example_data/raw/**" --exclude=""
+[lfs]
+	fetchexclude = example_data/raw/**

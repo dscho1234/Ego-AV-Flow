@@ -1,0 +1,28 @@
+# Short training run on the example episode in example_data/ to check an installation;
+# the resulting model is not meant to be useful.
+#   python scripts/active_vision/train_active_vision.py --config-name train_example
+defaults:
+  - train_active_vision
+  - _self_
+
+dataset_name: charuco_marker_bottle_under_table
+exp_name: example
+
+paths:
+  data_root: ${egoavflow_root:}/example_data
+
+# the single example episode is used for both training and the validation loss
+dataset:
+  data_dirs:
+    - ${paths.data_root}/${dataset_name}_validation
+evaluation:
+  gt_eval_dataset_args:
+    data_dirs:
+      - ${paths.data_root}/${dataset_name}_validation
+
+training:
+  epochs: 100
+  ckpt_frequency: 99
+  eval_logging_frequency: 10
+
+eval_off: true

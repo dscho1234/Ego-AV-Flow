@@ -1,0 +1,287 @@
+defaults:
+  - paths: default
+  - _self_
+
+exp_name: ${now:%Y-%m-%d_%H-%M-%S}_e${training.epochs}_bs_${training.batch_size}_pred_${dataset.pred_horizon}_h_${dataset.obs_horizon}_vh_${dataset.view_obs_horizon}_rdt_pred_${training.predict_flow}_sep_${training.predict_separate_flow}_fm_${training.use_flow_model}_dift_pt_${dataset.use_dift_point_tracking}_masking_f_${training.use_masking}_p_${training.use_proprio_masking}_ratio_${training.masking_ratio}_add_${training.additional_masking}_ptp_${training.use_ptp}_aug_${dataset.augment_se3}_e_${dataset.num_aug_per_episode}_cond_r_${training.condition_ratio}_vc_fv_fc_fpva_pi_r_2d_flow_${training.use_pixel_flow_for_robot_policy}
+hydra:
+  run:
+    dir: ${paths.output_root}/active_vision/${dataset_name}/${exp_name}
+  sweep:
+    dir: ${paths.output_root}/active_vision/${dataset_name}
+    subdir: ${exp_name}
+
+# Task name; data is read from ${paths.data_root}/${dataset_name}{,_invisible,_validation}
+dataset_name: ???
+
+project_name: active_vision_policy_3d  # wandb project
+
+eval_off: False  # skip the periodic offline evaluation launched from the training loop
+
+use_relative: true
+use_fix_mask: true
+debug: False
+action_dim: ${eval:7 if ${use_relative} else 10} # 7: position + euler + gripper (relative), 10: position + ortho6d + gripper (absolute)
+proprioception_dim: 10
+
+ema:
+  _target_: egoavflow.common.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+training:
+  epochs: 3001
+  gradient_accumulation_steps: 1
+  batch_size: 128
+  num_workers: 16
+  shuffle: True
+  pin_memory: True
+  persistent_workers: True
+  drop_last: False
+  _epochs_minus_one: ${eval:${training.epochs}-1}
+  ckpt_frequency: ${eval:${training._epochs_minus_one}/4}
+  eval_logging_frequency: ${eval:${training._epochs_minus_one}/25}
+  resume: False
+  model_path: null
+  model_ckpt: null
+  use_ema: True
+  use_masking: True
+  use_proprio_masking: True
+  use_viewpoint_masking: True
+  use_future_action_masking: True
+  masking_ratio: 0.5  # only whether it is zero matters
+  input_flow_dim: 3
+  use_fake_depth: True
+  slam_fake_value: 0  # depth value assigned to masked (dynamic) pixels when building the scene mesh
+  use_depth_estimate: False
+  tracker_type: "cotracker3"
+  policy_type: diffusion
+  visualize_raw_view_policy_output: True
+  droid: True
+  predict_flow: false
+  predict_separate_flow: false
+  use_pixel_flow_for_robot_policy: false # If true, robot policy uses pixel_flow_history[..., :2] instead of point_flow_history[..., :3]
+  robot_policy_input_flow_dim: ${eval:2 if ${training.use_pixel_flow_for_robot_policy} else ${training.input_flow_dim}}
+  use_ptp: true
+  additional_masking: True
+  # Weighted loss for action (use_relative=true, action_dim=7)
+  weight_pos: 1.0  # weight for position (dim 0:3)
+  weight_rot: 1.0  # weight for rotation (dim 3:6)
+  weight_gripper: 1.0  # weight for gripper (dim 6:7)
+  # Weighted loss for view_action (use_relative=true, view_action_dim=6)
+  view_weight_pos: 1.0  # weight for position (dim 0:3)
+  view_weight_rot: 1.0  # weight for rotation (dim 3:6)
+
+  condition_ratio: 0.0
+
+  # flow_model related
+  use_flow_model: true  # predict the future point flow with a separate flow_model
+
+evaluation:
+  eval_frequency: ${training.ckpt_frequency}
+  gt_eval_num: 1
+
+  gt_eval_dataset_args:
+    augment_se3: False
+    data_dirs:
+      - ${paths.data_root}/${dataset_name}
+      - ${paths.data_root}/${dataset_name}_invisible
+      - ${paths.data_root}/${dataset_name}_validation
+
+noise_scheduler:
+  num_train_timesteps: 100
+  beta_schedule: squaredcos_cap_v2
+  clip_sample: False  # True only with min_max normalization
+  prediction_type: epsilon
+num_inference_steps: 10
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1e-4
+  betas: [0.9, 0.999]
+  weight_decay: 1e-2
+  eps: 1e-08
+
+lr_scheduler: "cosine"
+num_warmup_steps: 500
+
+dataset:
+  _target_: egoavflow.diffusion_policy.dataloader.quest_dataset.QuestDataset
+  data_dirs:
+    - ${paths.data_root}/${dataset_name}
+    - ${paths.data_root}/${dataset_name}_invisible
+  point_tracking_img_size: [256,256] # [w, h]
+  pixel_tracking_img_size: [256,256]
+  camera_resize_shape: null
+  load_camera_ids: [0]
+  unnormal_list: ["camera_0","camera_6","point_tracking_sequence", "moving_mask","episode_idx","initial_frame","sample_indices","actual_sample_indices","robot_mask", "pixel_tracking_sequence", "dift_points", "text", "rgb", "depth", "extrinsics", "action_se3", "proprioception_se3",  "mask_point_tracking_sequence"]
+  num_points: 128
+  pred_horizon: 24
+  obs_horizon: 3
+  view_obs_horizon: 3
+  action_horizon: 8
+  action_dim: ${action_dim}
+  shuffle_points: True
+  downsample_rate: 2
+  max_episode_len: 350  # should be larger than padding_size / downsample_rate
+  padding_size: 350  # raw sequences are padded to this length before downsampling
+  is_sam: True
+
+  max_episode: null
+  flow_dim: 4
+
+  use_dift: True
+  num_dift_points: 6
+  rgbd_img_size: [640, 480] # [w, h]
+  use_dift_point_tracking: True
+  augment_se3: False
+  se3_translation_range: [0.05, 0.1, 0.1]  # +- meters in the marker frame
+  se3_rotation_range: 30 # +-30 deg
+  use_estimated_extrinsics: False
+  use_marker_coordinate: True
+  noise_aug_prob: 0.0
+  noise_aug_std: 0.1  # in normalized ([-1, 1]) units
+  backward_episode_len: 350
+  droid: ${training.droid}
+  use_relative: ${use_relative}
+  flow_norm_type: mean_std  # mean_std | min_max
+  norm_type: mean_std  # mean_std | min_max
+  use_ptp: ${training.use_ptp}
+  zero_padding_for_ptp_initial: False
+  action_norm_type: mean_std  # mean_std | min_max
+  num_aug_per_episode: 1
+  num_points_for_object: 4  # tracking points that belong to the first object (not used with dense flow)
+  num_points_per_mask: 64
+
+num_flow_points_default: ${eval:${dataset.num_dift_points} if ${dataset.use_dift_point_tracking} else ${dataset.num_points_per_mask}}
+num_flow_points: ${num_flow_points_default}
+
+# RDT Model Configuration
+rdt:
+  hidden_size: 512  # Model hidden dimension
+  depth: 12  # Number of transformer blocks
+  num_heads: 16  # Number of attention heads
+  proprio_token_dim: ${proprioception_dim}  # Proprioception token dimension
+  flow_adaptor_type: "mlp2x_gelu"  # Flow condition adapter type
+  proprio_adaptor_type: "mlp2x_gelu"  # Proprioception condition adapter type
+  viewpoint_adaptor_type: "mlp2x_gelu"  # Viewpoint condition adapter type
+  action_adaptor_type: "mlp3x_gelu"  # Action adapter type
+  use_bfloat16: False  # Use bfloat16 for model parameters
+  flow_pos_embed_config: null  # Optional: custom positional embedding config for flow
+  proprio_pos_embed_config: null  # Optional: custom positional embedding config for proprioception
+  noise_scheduler_config:
+    num_train_timesteps: ${noise_scheduler.num_train_timesteps}
+    beta_schedule: ${noise_scheduler.beta_schedule}
+    prediction_type: ${noise_scheduler.prediction_type}
+    clip_sample: ${noise_scheduler.clip_sample}
+    num_inference_steps: ${num_inference_steps}
+
+model:
+  _target_: egoavflow.models.custom_rdt.CustomRDTRunner
+  action_dim: ${action_dim}
+  pred_horizon: ${eval:${dataset.pred_horizon} + ${dataset.obs_horizon} - 1 if ${training.use_ptp} else ${dataset.pred_horizon}}
+  hidden_size: ${rdt.hidden_size}
+  depth: ${rdt.depth}
+  num_heads: ${rdt.num_heads}
+  flow_token_dim: ${eval:${training.robot_policy_input_flow_dim} * ${dataset.obs_horizon}}
+  proprio_token_dim: ${rdt.proprio_token_dim}
+  max_flow_cond_len: ${num_flow_points}
+  max_proprio_cond_len: ${dataset.obs_horizon}
+  flow_adaptor_type: ${rdt.flow_adaptor_type}
+  proprio_adaptor_type: ${rdt.proprio_adaptor_type}
+  action_adaptor_type: ${rdt.action_adaptor_type}
+  noise_scheduler_config: ${rdt.noise_scheduler_config}
+  flow_pos_embed_config: ${rdt.flow_pos_embed_config}
+  proprio_pos_embed_config: ${rdt.proprio_pos_embed_config}
+  dtype: null  # Will be set in Python code based on rdt.use_bfloat16
+  predict_flow: ${training.predict_flow}
+  predict_separate_flow: ${training.predict_separate_flow}
+  flow_output_dim: ${eval:${dataset.flow_dim} * ${num_flow_points}}  # N*D
+  use_dift_point_tracking: ${dataset.use_dift_point_tracking}
+  weight_pos: ${training.weight_pos}
+  weight_rot: ${training.weight_rot}
+  weight_gripper: ${training.weight_gripper}
+  # Condition types (model uses flow and proprioception only)
+  cond_types: [flow, proprio]  # Default condition types for model
+
+flow_model:
+  _target_: egoavflow.models.custom_rdt.CustomRDTRunner
+  action_dim: ${eval:${dataset.flow_dim} * ${num_flow_points}}  # flow_output_dim (N*D) as action_dim for flow_model
+  pred_horizon: ${eval:${dataset.pred_horizon} + ${dataset.obs_horizon} - 1 if ${training.use_ptp} else ${dataset.pred_horizon}}
+  hidden_size: ${rdt.hidden_size}
+  depth: ${rdt.depth}
+  num_heads: ${rdt.num_heads}
+  flow_token_dim: ${eval:${training.robot_policy_input_flow_dim} * ${dataset.obs_horizon}}
+  proprio_token_dim: ${rdt.proprio_token_dim}
+  max_flow_cond_len: ${num_flow_points}
+  max_proprio_cond_len: ${dataset.obs_horizon}
+  flow_adaptor_type: ${rdt.flow_adaptor_type}
+  proprio_adaptor_type: ${rdt.proprio_adaptor_type}
+  action_adaptor_type: ${rdt.action_adaptor_type}
+  noise_scheduler_config: ${rdt.noise_scheduler_config}
+  flow_pos_embed_config: ${rdt.flow_pos_embed_config}
+  proprio_pos_embed_config: ${rdt.proprio_pos_embed_config}
+  dtype: null  # Will be set in Python code based on rdt.use_bfloat16
+  predict_flow: false  # flow_model only predicts flow, not action
+  predict_separate_flow: false  # flow_model only predicts flow, not action
+  flow_output_dim: null  # Not used when predict_flow=False and predict_separate_flow=False
+  use_dift_point_tracking: ${dataset.use_dift_point_tracking}
+  weight_pos: 1.0  # Not used for flow_model (no action dimensions)
+  weight_rot: 1.0  # Not used for flow_model (no action dimensions)
+  weight_gripper: 1.0  # Not used for flow_model (no action dimensions)
+
+  viewpoint_token_dim: 9 # 9: position + ortho6d
+  max_viewpoint_cond_len: ${dataset.view_obs_horizon}  # Same as proprioception history length
+  viewpoint_adaptor_type: ${rdt.viewpoint_adaptor_type}  # Use same adaptor type as proprioception
+  viewpoint_pos_embed_config: null  # Optional: custom positional embedding config for viewpoint
+
+  # Future action condition parameters
+  future_action_token_dim: ${proprioception_dim}
+  max_future_action_cond_len: ${dataset.pred_horizon}  # Same as pred_horizon
+  future_action_adaptor_type: ${rdt.action_adaptor_type}  # Use same adaptor type as action
+  future_action_pos_embed_config: null  # Optional: custom positional embedding config for future action
+
+  # Condition types (flow_model uses flow, proprioception, viewpoint, and future_action)
+  cond_types: [flow, proprio, viewpoint, future_action]  # Condition types for flow_model
+
+view_model:
+  _target_: egoavflow.models.custom_rdt.CustomRDTRunner
+  action_dim: ${eval:${action_dim} - 1}  # view actions are 6-dim (action_dim - 1)
+  pred_horizon: ${eval:${dataset.pred_horizon} + ${dataset.obs_horizon} - 1 if ${training.use_ptp} else ${dataset.pred_horizon}}
+  hidden_size: ${rdt.hidden_size}
+  depth: ${rdt.depth}
+  num_heads: ${rdt.num_heads}
+  flow_token_dim: ${eval:${training.robot_policy_input_flow_dim} * ${dataset.view_obs_horizon} + 1}  # +1 for condition flag
+  proprio_token_dim: ${eval:${rdt.proprio_token_dim} + 1}  # +1 for condition flag
+  max_flow_cond_len: ${num_flow_points}
+  max_proprio_cond_len: ${dataset.view_obs_horizon}
+  flow_adaptor_type: ${rdt.flow_adaptor_type}
+  proprio_adaptor_type: ${rdt.proprio_adaptor_type}
+  action_adaptor_type: ${rdt.action_adaptor_type}
+  noise_scheduler_config: ${rdt.noise_scheduler_config}
+  flow_pos_embed_config: ${rdt.flow_pos_embed_config}
+  proprio_pos_embed_config: ${rdt.proprio_pos_embed_config}
+  dtype: null  # Will be set in Python code based on rdt.use_bfloat16
+  use_dift_point_tracking: ${dataset.use_dift_point_tracking}
+  weight_pos: ${training.view_weight_pos}
+  weight_rot: ${training.view_weight_rot}
+
+  # Viewpoint-related parameters (for view_model only)
+  viewpoint_token_dim: ${eval:9 + 1}  # 9: position + ortho6d, +1 for condition flag
+  max_viewpoint_cond_len: ${dataset.view_obs_horizon}  # Same as proprioception history length
+  viewpoint_adaptor_type: ${rdt.viewpoint_adaptor_type}  # Use same adaptor type as proprioception
+  viewpoint_pos_embed_config: null  # Optional: custom positional embedding config for viewpoint
+  cond_types: [flow, viewpoint]  # Condition types: can be ["flow", "proprio", "viewpoint"] or ["proprio", "viewpoint"] etc.
+
+# SVDD
+svdd:
+  temperature: 1.0
+  reward_option: visibility+close_to_query_points
+  visibility_reward_option: wo_consider_tracking_lost  # w_consider_tracking_lost | wo_consider_tracking_lost
+  duplicate: 10
+  eta: 1.0
+  close_to_nominal_weight: 0.5  # Hyperparameter for relative importance of close_to_nominal reward in visibility+close_to_nominal reward type
+  close_to_query_points_weight: 0.5  # Hyperparameter for relative importance of close_to_query_points reward in visibility+close_to_query_points reward type
+  batch_size: 3

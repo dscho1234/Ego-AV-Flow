@@ -1,0 +1,6 @@
+defaults:
+  - common
+  - _self_
+
+use_unoptimized_pose: false  # use T_mc_from_first_detection_droid instead of the pose-graph result
+show_only_visible: false  # plot only the visible samples of the query point tracks

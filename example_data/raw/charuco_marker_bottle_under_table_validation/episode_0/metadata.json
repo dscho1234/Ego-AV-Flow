@@ -1,0 +1,12 @@
+{
+  "episode": 0,
+  "timestamp": "2025-12-09T16:32:47.312351",
+  "resolution": {
+    "width": 640,
+    "height": 480
+  },
+  "fps": 30,
+  "frames": 410,
+  "imu_accel_fps": 250,
+  "imu_gyro_fps": 200
+}

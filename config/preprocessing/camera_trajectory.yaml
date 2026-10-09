@@ -1,0 +1,35 @@
+defaults:
+  - common
+  - _self_
+
+droid_checkpoint: ${checkpoint_root}/droid/droid.pth
+
+# Mask channels hidden from SLAM: the manipulated (first) object and the hand (last channel).
+# Other (static) objects stay visible.
+dynamic_mask_channels: [0, -1]
+use_rgb_noise: true  # masked pixels -> random colors
+use_fake_depth: true  # masked pixels -> zero depth
+seed: 0  # of the RGB noise, per episode: seed + episode index
+
+# DROID-SLAM (RGB-D) parameters
+droid:
+  buffer: 1024
+  disable_vis: true
+  beta: 0.5
+  filter_thresh: 2.0
+  warmup: 8
+  keyframe_thresh: 3.5
+  frontend_thresh: 16.0
+  frontend_window: 20
+  frontend_radius: 2
+  frontend_nms: 1
+  stereo: false
+  depth: true
+  backend_thresh: 22.0
+  backend_radius: 2
+  backend_nms: 3
+  motion_damping: 0.5
+  upsample: false
+  asynchronous: false
+  frontend_device: cuda
+  backend_device: cuda

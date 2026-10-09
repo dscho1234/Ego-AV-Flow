@@ -1,0 +1,9 @@
+defaults:
+  - common
+  - _self_
+
+# Number of query points. The paper uses 6, clicked on the manipulated object first
+# (see `query_point_object_ranges` in flow.yaml for the assignment of points to objects).
+n_points: 6
+# reuse episode_<i>/query_points.json (written after clicking) instead of opening the window
+reuse_clicks: true

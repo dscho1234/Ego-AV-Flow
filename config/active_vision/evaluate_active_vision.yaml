@@ -1,0 +1,56 @@
+defaults:
+  - paths: default
+  - _self_
+
+hydra:
+  run:
+    dir: ${paths.output_root}/evaluation/${now:%Y-%m-%d_%H-%M-%S}
+
+seed: 42
+model_path: null  # training run directory (contains .hydra/, checkpoints/, stats.pickle)
+ckpt: null  # epoch number of the checkpoint to load
+downsample_ratio: null  # must match dataset.downsample_rate used for training
+
+# Override the evaluation episodes stored in the checkpoint config (list of zarr directories).
+data_dirs: null
+# Evaluate only the first steps of every episode (null: the whole episode)
+max_steps: null
+
+# Robot descriptions used to render robot meshes for visibility reasoning.
+# Z1: camera (view) arm, WidowX AI: manipulation arm.
+z1_urdf_path: ${egoavflow_root:}/assets/robots/z1_description/xacro/z1.urdf
+z1_mesh_base_path: ${egoavflow_root:}/assets/robots/z1_description/
+widowx_urdf_path: ${egoavflow_root:}/assets/robots/trossen_arm_description/urdf/generated/wxai/wxai_base.urdf
+widowx_mesh_base_path: ${egoavflow_root:}/assets/robots/trossen_arm_description/
+cotracker_checkpoint: ${paths.checkpoint_root}/cotracker3/scaled_online.pth
+
+# Calibration of the data-collection setup (reference: 3x5 ChArUco board, marker id 1).
+# T_B_M: manipulation-arm base <- marker
+T_B_M: [[-0.03425969, 0.0125336,   0.99933437,  0.84160912],
+        [-0.01354625, -0.99983533,  0.01207548, -0.03610679],
+        [ 0.99932116, -0.01312353,  0.03442383,  0.75751154],
+        [ 0.,          0.,          0.,          1.        ]]
+
+# T_B_M_view: view-arm base <- marker
+T_B_M_view: [[-0.01867103, -0.00241674,  0.99982276,  0.74498277],
+             [-0.02852406, -0.99958876, -0.00294884, -0.65116371],
+             [ 0.99941872, -0.02857406,  0.01859442,  0.72092102],
+             [ 0.,          0.,          0.,          1.        ]]
+
+# T_E_C_view: view-arm end effector <- camera (hand-eye calibration)
+T_E_C_view: [[ 0.00523694, -0.09772001,  0.99520017,  0.02812511],
+             [-0.998772,    0.04851893,  0.01001987,  0.03098309],
+             [-0.04926519, -0.99403054, -0.09734592,  0.05319822],
+             [ 0.,          0.,          0.,          1.        ]]
+
+ee_bias: [-0.06, 0.0, 0.0]
+
+visibility_reward_type: w_consider_tracking_lost # w_consider_tracking_lost | wo_consider_tracking_lost
+
+use_mask_depth_filter: True
+mask_point_tracking_threshold: 0.1 # 10cm
+num_points_per_mask: 64
+use_retargeting: True
+use_visibility_aware_retargeting: False
+use_future_action_for_flow_model: True
+query_point_indices: null

@@ -1,0 +1,24 @@
+# Settings shared by the preprocessing steps (included through each step's `defaults`).
+
+hydra:
+  run:
+    dir: ${oc.env:EGOAVFLOW_OUTPUT_ROOT,${egoavflow_root:}/outputs}/preprocessing/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    chdir: false
+
+# Recording directories (<data_root>/<task>, <data_root>/<task>_invisible, ...) to process
+data_dirs: ???
+# Episodes [episode_start, episode_end) of every directory; null processes all of them
+episode_start: null
+episode_end: null
+
+# Pretrained third-party weights (scripts/download_checkpoints.sh)
+checkpoint_root: ${oc.env:EGOAVFLOW_CHECKPOINT_ROOT,${egoavflow_root:}/checkpoints}
+
+# Intel RealSense D435 color camera (640x480), calibrated without lens distortion
+camera:
+  intrinsics: [[587.91149507, 0., 335.56750204],
+               [0., 586.79415747, 242.1979624],
+               [0., 0., 1.]]
+  height: 480
+  width: 640

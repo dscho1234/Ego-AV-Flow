@@ -1,0 +1,35 @@
+defaults:
+  - common
+  - _self_
+
+# Task description and object names (GroundingDINO prompts / click labels). The first object is
+# the manipulated one: it determines the grasp and the episode start. Settings used for the paper:
+#   bottle_under_table:        "move the spray",        [spray]
+#   box_under_drawer:          "move the puppy doll",   [puppy doll, rattan basket]
+#   toilet_paper_under_drawer: "move the toilet paper", [toilet paper]
+#   towel:                     "move the towel",        [brown towel, rattan basket]
+task: ???
+object: ???
+
+# Segment from clicks in a GUI window (true, used for the paper) or from GroundingDINO boxes (false)
+manual_segmentation: true
+manual_start_frame: 100  # frame shown first in the click window
+# reuse episode_<i>/segmentation_clicks.json (written after clicking) instead of opening the window
+reuse_clicks: true
+object_box_threshold: 0.55
+hand_box_threshold: 0.45
+
+grounding_dino_checkpoint: ${checkpoint_root}/grounding_dino/groundingdino_swint_ogc.pth
+sam_checkpoint: ${checkpoint_root}/sam/sam_vit_h_4b8939.pth
+
+use_depth_rescaled_hand_pose: true  # gripper translation rescaled with the depth at the wrist
+temporal_smoothing_sigma: 2.0  # Gaussian smoothing (frames) of the gripper trajectory; 0 disables it
+
+grasp:
+  # gripper closed when the thumb tip and the index tip are closer than this (m);
+  # 0.08 for toilet_paper_under_drawer, 0.05 for towel
+  max_thumb_index_dist: 0.06
+
+# Only recompute the gripper state of existing episodes with `grasp.max_thumb_index_dist`
+update_gripper_only: false
+save_video: true

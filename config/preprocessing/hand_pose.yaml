@@ -1,0 +1,11 @@
+defaults:
+  - common
+  - _self_
+
+hand_side: right  # right | left | auto
+rescale_factor: 2.0  # padding of the hand box fed to HaMeR
+wrist_depth_bias: 0.03  # wrist thickness (m) added to the depth measured at the wrist
+# frames whose wrist translation jumps (median absolute deviation test) are dropped
+spike_threshold_factor: 30.0
+spike_window_size: 5
+save_video: true  # episode_<i>/video.mp4 with the hand mesh and the gripper frame

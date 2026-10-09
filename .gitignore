@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints/
+
+# Default data / output / checkpoint locations (config/active_vision/paths/default.yaml)
+data/
+outputs/
+checkpoints/
+
+# Logs and media
+wandb/
+.hydra/
+*.log
+*.mp4
+*.gif
